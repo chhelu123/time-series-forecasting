@@ -1,0 +1,12 @@
+,Passengers ('000)
+count,144.0
+mean,280.299
+std,119.966
+min,104.0
+25%,180.0
+50%,265.5
+75%,360.5
+max,622.0
+skewness,0.577
+kurtosis,-0.394
+coef. of variation %,42.799
