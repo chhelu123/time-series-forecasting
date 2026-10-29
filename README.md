@@ -2,6 +2,8 @@
 
 **Mini Project - Statistical Methods (SM), TY BTech**
 
+**Live report:** https://chhelu123.github.io/time-series-forecasting/
+
 Python | pandas | statsmodels | matplotlib
 
 ---

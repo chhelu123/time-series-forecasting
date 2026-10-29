@@ -1,0 +1,824 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Airline Passengers Time Series</title><style>
+@page { size: A4; margin: 16mm 15mm 16mm 15mm; }
+:root { --ink:#1a1a1a; --ink2:#52514e; --accent:#2a78d6; --rule:#d9d8d3; --code:#f5f5f2; }
+html { background:#fff; }
+body { font-family: "Segoe UI", Calibri, Arial, sans-serif; color:var(--ink); font-size:10.5pt; line-height:1.5; margin:0; background:#fff; }
+h2 { font-size:15pt; color:var(--accent); border-bottom:2px solid var(--accent); padding-bottom:3px; margin:22px 0 10px; break-after:avoid; }
+h3 { font-size:12pt; margin:16px 0 6px; break-after:avoid; }
+p, li { text-align: justify; }
+code { font-family: Consolas, "Courier New", monospace; font-size:9pt; background:var(--code); padding:1px 3px; border-radius:3px; }
+pre { background:var(--code); border:1px solid var(--rule); border-left:3px solid var(--accent); padding:8px 10px; border-radius:4px; overflow:hidden; white-space:pre-wrap; break-inside:avoid; }
+pre code { background:none; padding:0; font-size:8.6pt; line-height:1.4; }
+table { border-collapse:collapse; margin:8px 0 12px; font-size:9.3pt; break-inside:avoid; }
+th, td { border:1px solid var(--rule); padding:4px 8px; text-align:left; vertical-align:top; }
+th { background:#eef3fb; }
+td:empty { border-top:none; border-bottom:none; }
+figure { margin:10px 0 14px; text-align:center; break-inside:avoid; }
+figure img { max-width:100%; max-height:118mm; }
+figcaption { font-size:9pt; color:var(--ink2); margin-top:3px; }
+a { color:var(--accent); text-decoration:none; word-break:break-all; }
+.cover { height: 255mm; display:flex; flex-direction:column; justify-content:center; text-align:center; break-after:page; }
+.cover .kicker { letter-spacing:2px; text-transform:uppercase; color:var(--ink2); font-size:11pt; }
+.cover h1 { font-size:26pt; line-height:1.25; margin:14px 0 8px; }
+.cover .sub { font-size:13pt; color:var(--accent); margin-bottom:26px; }
+.cover img { width:85%; margin:0 auto 28px; border:1px solid var(--rule); }
+.cover table { margin: 0 auto; font-size:11pt; }
+.cover td { border:none; padding:5px 12px; text-align:left; }
+.cover td.blank { border-bottom:1px solid var(--ink2); min-width:65mm; }
+
+@media screen {
+  html { background:#f4f4f1; }
+  body { max-width:900px; margin:0 auto; padding:0 24px 48px; background:#fff; font-size:16px;
+         box-shadow:0 0 24px rgba(0,0,0,.06); }
+  .cover { height:auto; padding:48px 0 32px; border-bottom:1px solid var(--rule); }
+  .cover tr:has(td.blank) { display:none; }
+  .links { display:flex; flex-wrap:wrap; gap:10px; justify-content:center; margin-top:4px; }
+  .links a { border:1px solid var(--accent); border-radius:6px; padding:8px 14px; word-break:normal; }
+  .links a.primary { background:var(--accent); color:#fff; }
+  main table { max-width:100%; display:block; overflow-x:auto; }
+  pre { overflow-x:auto; }
+  figure img { max-height:none; }
+}
+@media screen and (max-width:600px) {
+  body { padding:0 16px 32px; font-size:15px; }
+  .cover h1 { font-size:24px; }
+  p, li { text-align:left; }
+}
+@media print { .links { display:none; } }
+</style></head>
+<body><section class="cover">
+<div class="kicker">Statistical Methods (SM) - Mini Project</div>
+<h1>Time Series Analysis and Forecasting of Monthly Airline Passengers (1949-1960)</h1>
+<div class="sub">Decomposition, stationarity testing, ARIMA / SARIMA / Holt-Winters and a 24-month forecast</div>
+<img src="outputs/figures/15_future_forecast.png" alt="Forecast">
+<table>
+<tr><td>Course</td><td>TY BTech - Statistical Methods</td></tr>
+<tr><td>Submitted by</td><td class="blank"></td></tr>
+<tr><td>Roll No.</td><td class="blank"></td></tr>
+<tr><td>Tools</td><td>Python 3.12, pandas, statsmodels, matplotlib</td></tr>
+<tr><td>Code</td><td>github.com/chhelu123/time-series-forecasting</td></tr>
+</table>
+<div class="links">
+<a class="primary" href="REPORT.pdf">Download report (PDF)</a>
+<a href="https://github.com/chhelu123/time-series-forecasting/blob/main/time_series_analysis.ipynb">Jupyter notebook</a>
+<a href="https://github.com/chhelu123/time-series-forecasting/blob/main/src/analysis.py">Python script</a>
+<a href="https://github.com/chhelu123/time-series-forecasting">Source code on GitHub</a>
+</div>
+</section>
+<main><h2>1. Aim</h2>
+<p>To perform a complete <strong>time series analysis</strong> on a real monthly dataset: identify
+its components (trend, seasonality, irregular), test it for stationarity, identify
+a suitable model from its autocorrelation structure, compare classical forecasting
+methods on held-out data, check the best model's residuals, and forecast the next
+24 months with confidence intervals.</p>
+<h2>2. Description</h2>
+<p>A <em>time series</em> is a sequence of observations recorded at equal time intervals.
+Unlike ordinary data, the observations are not independent: this month's value
+depends on previous months. Time series analysis uses this dependence to
+describe the past and forecast the future.</p>
+<p>This project works through the full Box-Jenkins workflow on the classic <em>Air
+Passengers</em> series:</p>
+<ol>
+<li>Load and clean the data, compute summary statistics and plot the series</li>
+<li>Rolling statistics, seasonal decomposition (additive, multiplicative, STL) and seasonal plots</li>
+<li>Stationarity tests (ADF and KPSS), log transform, regular and seasonal differencing</li>
+<li>ACF/PACF plots and model order identification</li>
+<li>Train/test split (last 24 months as test), then seven forecasting models</li>
+<li>Residual diagnostics (residual plot, histogram, Q-Q plot, ACF, Ljung-Box test)</li>
+<li>Model evaluation with MAE, RMSE and MAPE</li>
+<li>Refit the best model on all data and forecast 1961-1962</li>
+<li>Conclusions</li>
+</ol>
+<h2>3. Dataset</h2>
+<table>
+<thead>
+<tr>
+  <th>Item</th>
+  <th>Detail</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>Name</td>
+  <td>International Airline Passengers (Box &amp; Jenkins &quot;Series G&quot;)</td>
+</tr>
+<tr>
+  <td>Variable</td>
+  <td>Monthly total of international airline passengers, in <strong>thousands</strong></td>
+</tr>
+<tr>
+  <td>Period</td>
+  <td>January 1949 to December 1960</td>
+</tr>
+<tr>
+  <td>Observations</td>
+  <td>144 (12 years x 12 months), no missing values</td>
+</tr>
+<tr>
+  <td>File</td>
+  <td><code>data/AirPassengers.csv</code> (columns <code>Month</code>, <code>Passengers</code>)</td>
+</tr>
+<tr>
+  <td>Original source</td>
+  <td>Box, G.E.P., Jenkins, G.M. &amp; Reinsel, G.C. <em>Time Series Analysis: Forecasting and Control</em>, Series G (1976). Also bundled with R as <code>datasets::AirPassengers</code>.</td>
+</tr>
+<tr>
+  <td>Download URL</td>
+  <td><a href="https://raw.githubusercontent.com/jbrownlee/Datasets/master/airline-passengers.csv">https://raw.githubusercontent.com/jbrownlee/Datasets/master/airline-passengers.csv</a></td>
+</tr>
+</tbody>
+</table>
+<p>It was chosen because it is the textbook example of a series with <strong>both trend and
+seasonality</strong>, and because the variance grows with the level, which makes it a
+good case for log transforms and multiplicative models.</p>
+<p><strong>Summary statistics (thousand passengers)</strong></p>
+<table>
+<thead>
+<tr>
+  <th>Statistic</th>
+  <th>Value</th>
+  <th></th>
+  <th>Statistic</th>
+  <th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>Mean</td>
+  <td>280.30</td>
+  <td></td>
+  <td>Minimum</td>
+  <td>104 (Nov 1949)</td>
+</tr>
+<tr>
+  <td>Standard deviation</td>
+  <td>119.97</td>
+  <td></td>
+  <td>Maximum</td>
+  <td>622 (Jul 1960)</td>
+</tr>
+<tr>
+  <td>Median</td>
+  <td>265.50</td>
+  <td></td>
+  <td>Skewness</td>
+  <td>0.58</td>
+</tr>
+<tr>
+  <td>Q1 / Q3</td>
+  <td>180.0 / 360.5</td>
+  <td></td>
+  <td>Coefficient of variation</td>
+  <td>42.8 %</td>
+</tr>
+</tbody>
+</table>
+<p>The yearly total rose from 1,520 thousand (1949) to 5,714 thousand (1960), a
+3.8x increase. Growth was positive every year (3.4 % to 21.8 % per year). The year-wise
+table is saved in <code>outputs/yearly_statistics.csv</code>.</p>
+<h2>4. Methodology (theory)</h2>
+<h3>4.1 Components of a time series</h3>
+<table>
+<thead>
+<tr>
+  <th>Component</th>
+  <th>Meaning</th>
+  <th>In this data</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>Trend (T)</td>
+  <td>long-term upward/downward movement</td>
+  <td>steady growth of air travel</td>
+</tr>
+<tr>
+  <td>Seasonality (S)</td>
+  <td>pattern repeating with a fixed period (here 12 months)</td>
+  <td>summer holiday peak (Jul-Aug)</td>
+</tr>
+<tr>
+  <td>Cyclical (C)</td>
+  <td>rises and falls longer than a year with no fixed period</td>
+  <td>not visible in 12 years</td>
+</tr>
+<tr>
+  <td>Irregular / residual (R)</td>
+  <td>random noise left after removing the above</td>
+  <td>small</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>Additive model:</strong> Y = T + S + R. Use it when the seasonal swing is constant.</li>
+<li><strong>Multiplicative model:</strong> Y = T x S x R. Use it when the seasonal swing grows with the level.
+Taking logs turns a multiplicative model into an additive one: log Y = log T + log S + log R.</li>
+<li><strong>STL</strong> (Seasonal-Trend decomposition using LOESS) is a robust, non-parametric
+decomposition that lets the seasonal pattern change slowly over time.</li>
+</ul>
+<h3>4.2 Stationarity</h3>
+<p>A series is (weakly) <strong>stationary</strong> if its mean, variance and autocovariance do not
+change over time. ARIMA models require a stationary series. Common fixes:</p>
+<ul>
+<li><strong>Log transform</strong> to stabilise variance that grows with the level</li>
+<li><strong>First difference</strong> (Y_t - Y_(t-1)) to remove a trend</li>
+<li><strong>Seasonal difference</strong> (Y_t - Y_(t-12)) to remove a stable seasonal pattern</li>
+</ul>
+<h3>4.3 ADF and KPSS tests</h3>
+<table>
+<thead>
+<tr>
+  <th>Test</th>
+  <th>Null hypothesis H0</th>
+  <th>Stationary if</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>Augmented Dickey-Fuller (ADF)</td>
+  <td>series has a unit root (non-stationary)</td>
+  <td>p &lt; 0.05 (reject H0)</td>
+</tr>
+<tr>
+  <td>KPSS</td>
+  <td>series is stationary</td>
+  <td>p &gt;= 0.05 (do not reject H0)</td>
+</tr>
+</tbody>
+</table>
+<p>The two tests have opposite null hypotheses, so we use both. We call a series
+stationary only when ADF rejects <strong>and</strong> KPSS does not reject.</p>
+<h3>4.4 ACF and PACF</h3>
+<ul>
+<li><strong>ACF</strong> (autocorrelation function): correlation between Y_t and Y_(t-k) for each lag k.</li>
+<li><strong>PACF</strong> (partial ACF): correlation at lag k after removing the effect of lags 1..k-1.</li>
+<li>Identification rules: AR(p) means the PACF cuts off after lag p and the ACF tails off.
+MA(q) means the ACF cuts off after lag q and the PACF tails off. Spikes at
+lags 12, 24, ... point to seasonal AR (P) or MA (Q) terms.</li>
+<li>Bars outside the band +/- 1.96/sqrt(n) are significant at the 5 % level.</li>
+</ul>
+<h3>4.5 ARIMA and SARIMA</h3>
+<p><strong>ARIMA(p, d, q)</strong>: an AutoRegressive model of order p on the series differenced d
+times, plus Moving-Average terms of order q:</p>
+<pre><code>(1 - phi_1 B - ... - phi_p B^p) (1 - B)^d Y_t = (1 + theta_1 B + ... + theta_q B^q) e_t</code></pre>
+<p>where B is the backshift operator (B Y_t = Y_(t-1)) and e_t is white noise.</p>
+<p><strong>SARIMA(p, d, q)(P, D, Q)[s]</strong> adds seasonal AR/MA polynomials in B^s and seasonal
+differencing (1 - B^s)^D. Here s = 12. The well-known <strong>&quot;airline model&quot;</strong> is
+SARIMA(0,1,1)(0,1,1)[12]. Orders are chosen with the <strong>AIC</strong> (Akaike Information
+Criterion = 2k - 2 ln L), which balances goodness of fit against the number of
+parameters k. Lower is better.</p>
+<h3>4.6 Exponential smoothing and Holt-Winters</h3>
+<ul>
+<li><strong>Simple exponential smoothing (SES):</strong> level_t = alpha Y_t + (1 - alpha) level_(t-1). It gives a flat forecast and suits data with no trend and no seasonality.</li>
+<li><strong>Holt-Winters (triple exponential smoothing / ETS):</strong> three smoothing equations, for level (alpha), trend (beta) and seasonality (gamma). The multiplicative-seasonal version forecasts (level + h x trend) x seasonal index.</li>
+<li><strong>Baselines:</strong> <em>naive</em> (repeat the last value), <em>seasonal naive</em> (repeat the value from the same month last year) and <em>moving average</em> (mean of the last 12 months). A useful model must beat these.</li>
+</ul>
+<h3>4.7 Error metrics</h3>
+<table>
+<thead>
+<tr>
+  <th>Metric</th>
+  <th>Formula</th>
+  <th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>MAE</td>
+  <td>(1/n) sum of abs(y_t - yhat_t)</td>
+  <td>average error, same unit as the data</td>
+</tr>
+<tr>
+  <td>RMSE</td>
+  <td>sqrt( (1/n) sum of (y_t - yhat_t)^2 )</td>
+  <td>penalises large errors more</td>
+</tr>
+<tr>
+  <td>MAPE</td>
+  <td>(100/n) sum of abs( (y_t - yhat_t) / y_t )</td>
+  <td>percentage error, scale-free</td>
+</tr>
+</tbody>
+</table>
+<h3>4.8 Residual diagnostics</h3>
+<p>The residuals of an adequate model should be <strong>white noise</strong>: mean about 0, constant
+variance, roughly normal and uncorrelated. We check this with a residual plot, a
+histogram, a normal Q-Q plot, the residual ACF and the <strong>Ljung-Box test</strong>
+(H0: no autocorrelation up to lag h; p &gt; 0.05 means the model is adequate).</p>
+<h2>5. How to run</h2>
+<pre><code class="language-bash">git clone https://github.com/chhelu123/time-series-forecasting.git
+cd time-series-forecasting
+pip install -r requirements.txt
+
+# Option 1: plain script, writes every figure and table to outputs/
+python src/analysis.py
+
+# Option 2: open the notebook (already executed, all outputs saved)
+jupyter notebook time_series_analysis.ipynb
+</code></pre>
+<p>Run time is about 1 minute (most of it is the SARIMA grid search).</p>
+<p><strong>Project structure</strong></p>
+<pre><code>time-series-forecasting/
+|-- data/AirPassengers.csv            dataset
+|-- src/analysis.py                   full pipeline as a script
+|-- time_series_analysis.ipynb        same pipeline, executed notebook
+|-- outputs/
+|   |-- figures/*.png                 15 figures
+|   |-- metrics.csv                   MAE / RMSE / MAPE of all models
+|   |-- stationarity_tests.csv        ADF + KPSS results
+|   |-- sarima_grid_search.csv        AIC of all 36 SARIMA models
+|   |-- forecast_next_24_months.csv   forecast with 80 % / 95 % intervals
+|   `-- ...                           summary stats, Ljung-Box tables
+|-- report/report.html                printable report (source of REPORT.pdf)
+|-- REPORT.pdf
+`-- README.md                         this report
+</code></pre>
+<h2>6. Key code snippets</h2>
+<p><strong>Loading the data with a monthly DatetimeIndex</strong></p>
+<pre><code class="language-python">df = pd.read_csv(DATA)
+df[&quot;Month&quot;] = pd.to_datetime(df[&quot;Month&quot;], format=&quot;%Y-%m&quot;)
+df = df.drop_duplicates(&quot;Month&quot;).set_index(&quot;Month&quot;).sort_index()
+y = df[&quot;Passengers&quot;].asfreq(&quot;MS&quot;).astype(float)   # MS = month-start frequency
+</code></pre>
+<p><code>asfreq(&quot;MS&quot;)</code> fixes the frequency. Any missing month would appear as NaN, which
+lets us verify that the series is complete (it is: 0 missing values).</p>
+<p><strong>Decomposition</strong></p>
+<pre><code class="language-python">dec_add = seasonal_decompose(y, model=&quot;additive&quot;, period=12)
+dec_mul = seasonal_decompose(y, model=&quot;multiplicative&quot;, period=12)
+stl = STL(np.log(y), period=12, robust=True).fit()
+</code></pre>
+<p><strong>ADF + KPSS in one function</strong></p>
+<pre><code class="language-python">def stationarity(series, name):
+    s = series.dropna()
+    adf_stat, adf_p, *_ = adfuller(s, autolag=&quot;AIC&quot;)
+    kpss_stat, kpss_p, *_ = kpss(s, regression=&quot;c&quot;, nlags=&quot;auto&quot;)
+    adf_ok, kpss_ok = adf_p &lt; 0.05, kpss_p &gt;= 0.05   # both must agree
+    ...
+
+d1_12 = np.log(y).diff().diff(12)    # log + first + seasonal difference
+</code></pre>
+<p><strong>SARIMA order selection by AIC grid search (on log scale)</strong></p>
+<pre><code class="language-python">for p, q, P, Q in itertools.product(range(3), range(3), range(2), range(2)):
+    res = SARIMAX(np.log(train), order=(p, 1, q),
+                  seasonal_order=(P, 1, Q, 12)).fit(disp=False)
+    sarima_grid.append({&quot;order&quot;: (p, 1, q), &quot;seasonal_order&quot;: (P, 1, Q, 12),
+                        &quot;AIC&quot;: res.aic})
+# forecasts are transformed back with exp()
+forecast = np.exp(sarima.get_forecast(24).predicted_mean)
+</code></pre>
+<p><strong>Holt-Winters (additive trend, multiplicative seasonality)</strong></p>
+<pre><code class="language-python">hw = ExponentialSmoothing(train, trend=&quot;add&quot;, seasonal=&quot;mul&quot;,
+                          seasonal_periods=12,
+                          initialization_method=&quot;estimated&quot;).fit()
+forecast = hw.forecast(24)
+</code></pre>
+<p><strong>Evaluation metrics</strong></p>
+<pre><code class="language-python">def metrics(actual, pred):
+    e = actual - pred
+    return {&quot;MAE&quot;: np.mean(np.abs(e)),
+            &quot;RMSE&quot;: np.sqrt(np.mean(e ** 2)),
+            &quot;MAPE (%)&quot;: 100 * np.mean(np.abs(e / actual))}
+</code></pre>
+<p><strong>Residual diagnostics: Ljung-Box</strong></p>
+<pre><code class="language-python">lb = acorr_ljungbox(resid, lags=[6, 12, 18, 24], return_df=True)
+</code></pre>
+<h2>7. Output and interpretation</h2>
+<h3>7.1 The series</h3>
+<figure><img src="outputs/figures/01_time_series.png" alt="Time series"><figcaption>Figure 1: Time series</figcaption></figure>
+<p>The series shows a clear <strong>upward trend</strong> and a <strong>12-month seasonal cycle</strong>, and the
+seasonal swings become wider as the level rises.</p>
+<figure><img src="outputs/figures/02_rolling_statistics.png" alt="Rolling statistics"><figcaption>Figure 2: Rolling statistics</figcaption></figure>
+<p>The 12-month rolling mean rises steadily. The rolling standard deviation rises from
+13.7 (1949) to 77.7 (1960). Because both the mean and the variance change, the
+series is <strong>not stationary</strong>.</p>
+<h3>7.2 Decomposition</h3>
+<figure><img src="outputs/figures/03_decomposition_additive.png" alt="Additive decomposition"><figcaption>Figure 3: Additive decomposition</figcaption></figure>
+<figure><img src="outputs/figures/04_decomposition_multiplicative.png" alt="Multiplicative decomposition"><figcaption>Figure 4: Multiplicative decomposition</figcaption></figure>
+<figure><img src="outputs/figures/05_decomposition_stl.png" alt="STL decomposition"><figcaption>Figure 5: STL decomposition</figcaption></figure>
+<ul>
+<li>The <strong>additive</strong> residuals still contain a seasonal pattern that is large at
+both ends of the series (lag-1 autocorrelation 0.67). A fixed seasonal amount
+cannot describe swings that keep growing.</li>
+<li>The <strong>multiplicative</strong> residuals are smaller and less structured (lag-1
+autocorrelation 0.40). The seasonal indices are Jul 1.227, Aug 1.220 and Nov 0.801:
+July traffic is about 23 % above an average month and November about 20 % below.</li>
+<li><strong>STL on log(Y)</strong> gives a strength of trend of 0.996 and a strength of seasonality
+of 0.959 (both on a 0-1 scale), so both components are very strong.</li>
+</ul>
+<h3>7.3 Seasonality</h3>
+<figure><img src="outputs/figures/06_seasonal_boxplot_and_plot.png" alt="Seasonal box plot and seasonal plot"><figcaption>Figure 6: Seasonal box plot and seasonal plot</figcaption></figure>
+<figure><img src="outputs/figures/07_seasonal_subseries.png" alt="Seasonal sub-series"><figcaption>Figure 7: Seasonal sub-series</figcaption></figure>
+<p>July and August are the busiest months in every year and November is the
+quietest. The year lines are stacked almost in order, and only 1957 and 1958
+overlap (1958 had the weakest growth). The <em>shape</em> of the season is stable while
+its <em>level</em> rises. Each month's sub-series rises steadily (trend).</p>
+<h3>7.4 Stationarity tests</h3>
+<table>
+<thead>
+<tr>
+  <th>Series</th>
+  <th>ADF stat</th>
+  <th>ADF p</th>
+  <th>KPSS stat</th>
+  <th>KPSS p</th>
+  <th>Conclusion</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>Original Y</td>
+  <td>0.815</td>
+  <td>0.9919</td>
+  <td>1.651</td>
+  <td>0.01</td>
+  <td>Non-stationary</td>
+</tr>
+<tr>
+  <td>log(Y)</td>
+  <td>-1.717</td>
+  <td>0.4224</td>
+  <td>1.669</td>
+  <td>0.01</td>
+  <td>Non-stationary</td>
+</tr>
+<tr>
+  <td>log(Y), 1st difference</td>
+  <td>-2.717</td>
+  <td>0.0711</td>
+  <td>0.038</td>
+  <td>0.10</td>
+  <td>Inconclusive</td>
+</tr>
+<tr>
+  <td>log(Y), seasonal difference</td>
+  <td>-2.710</td>
+  <td>0.0724</td>
+  <td>0.292</td>
+  <td>0.10</td>
+  <td>Inconclusive</td>
+</tr>
+<tr>
+  <td><strong>log(Y), 1st + seasonal difference</strong></td>
+  <td><strong>-4.443</strong></td>
+  <td><strong>0.0002</strong></td>
+  <td><strong>0.073</strong></td>
+  <td><strong>0.10</strong></td>
+  <td><strong>Stationary</strong></td>
+</tr>
+</tbody>
+</table>
+<p>(KPSS p-values are interpolated from a table and capped at 0.01 and 0.10.)</p>
+<figure><img src="outputs/figures/08_transformations.png" alt="Transformations"><figcaption>Figure 8: Transformations</figcaption></figure>
+<p>The log transform makes the seasonal swings equal in size, but the trend remains.
+A single difference of either kind is not enough: ADF p is about 0.07. Only after
+one regular <strong>and</strong> one seasonal difference do both tests agree that the series
+is stationary. This gives <strong>d = 1, D = 1, s = 12</strong>.</p>
+<h3>7.5 ACF / PACF and model identification</h3>
+<figure><img src="outputs/figures/09_acf_pacf.png" alt="ACF and PACF"><figcaption>Figure 9: ACF and PACF</figcaption></figure>
+<ul>
+<li>The ACF of the original series decays very slowly, with bumps at 12, 24 and 36.
+This is the typical signature of a trend plus seasonality (non-stationary).</li>
+<li>For the stationary series log(Y) with d = 1 and D = 1, the largest ACF spikes are at <strong>lag 1 (-0.34)</strong>
+and <strong>lag 12 (-0.39)</strong>. Smaller spikes at lags 3, 9 and 23 (|r| about 0.2) only just
+cross the significance band (+/- 0.17). The PACF decays at the start of the series and
+again around lag 12.</li>
+<li>A single negative ACF spike at lag 1 suggests a non-seasonal MA(1), and a negative spike at
+lag 12 suggests a seasonal MA(1). The tentative model is <strong>SARIMA(0,1,1)(0,1,1)[12]</strong>.</li>
+</ul>
+<p>The AIC grid search over 36 candidate models (p, q = 0..2; P, Q = 0..1) selected
+the same model:</p>
+<table>
+<thead>
+<tr>
+  <th>order</th>
+  <th>seasonal order</th>
+  <th>AIC</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><strong>(0,1,1)</strong></td>
+  <td><strong>(0,1,1)[12]</strong></td>
+  <td><strong>-389.01</strong></td>
+</tr>
+<tr>
+  <td>(1,1,0)</td>
+  <td>(0,1,1)[12]</td>
+  <td>-388.64</td>
+</tr>
+<tr>
+  <td>(1,1,1)</td>
+  <td>(0,1,1)[12]</td>
+  <td>-387.28</td>
+</tr>
+<tr>
+  <td>(0,1,1)</td>
+  <td>(1,1,1)[12]</td>
+  <td>-387.22</td>
+</tr>
+</tbody>
+</table>
+<p>Fitted coefficients on 1949-1958: MA(1) theta = -0.342 (p &lt; 0.001) and seasonal
+MA(1) Theta = -0.541 (p &lt; 0.001). Both are significant.</p>
+<p>The non-seasonal <strong>ARIMA</strong> grid (p, q = 0..3, d = 1) selected ARIMA(3,1,3). The
+Holt-Winters variant with the lowest AIC was <strong>additive trend + multiplicative
+seasonality</strong>, undamped (AIC 571.6, against 619.4 for additive seasonality). Its
+parameters were alpha = 0.364, beta = 0.000 and gamma = 0.636.</p>
+<h3>7.6 Model comparison (test set: Jan 1959 to Dec 1960, 24 months)</h3>
+<table>
+<thead>
+<tr>
+  <th>Rank</th>
+  <th>Model</th>
+  <th>MAE</th>
+  <th>RMSE</th>
+  <th>MAPE (%)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>1</td>
+  <td><strong>Holt-Winters (add. trend, mul. season)</strong></td>
+  <td><strong>28.98</strong></td>
+  <td><strong>32.49</strong></td>
+  <td><strong>6.39</strong></td>
+</tr>
+<tr>
+  <td>2</td>
+  <td>SARIMA(0,1,1)(0,1,1)[12]</td>
+  <td>39.44</td>
+  <td>43.18</td>
+  <td>8.52</td>
+</tr>
+<tr>
+  <td>3</td>
+  <td>Seasonal naive</td>
+  <td>71.25</td>
+  <td>77.00</td>
+  <td>15.52</td>
+</tr>
+<tr>
+  <td>4</td>
+  <td>ARIMA(3,1,3)</td>
+  <td>70.70</td>
+  <td>92.44</td>
+  <td>14.09</td>
+</tr>
+<tr>
+  <td>5</td>
+  <td>Moving average (12)</td>
+  <td>77.83</td>
+  <td>103.22</td>
+  <td>15.47</td>
+</tr>
+<tr>
+  <td>6</td>
+  <td>Naive</td>
+  <td>115.25</td>
+  <td>137.33</td>
+  <td>23.58</td>
+</tr>
+<tr>
+  <td>6</td>
+  <td>Simple exponential smoothing</td>
+  <td>115.25</td>
+  <td>137.33</td>
+  <td>23.58</td>
+</tr>
+</tbody>
+</table>
+<p>(Saved as <code>outputs/metrics.csv</code>. MAE and RMSE are in thousand passengers.)</p>
+<figure><img src="outputs/figures/10_forecasts_vs_actual.png" alt="Forecasts vs actual"><figcaption>Figure 10: Forecasts vs actual</figcaption></figure>
+<figure><img src="outputs/figures/11_all_models_test_period.png" alt="All models on the test set"><figcaption>Figure 11: All models on the test set</figcaption></figure>
+<figure><img src="outputs/figures/12_model_comparison_rmse.png" alt="RMSE comparison"><figcaption>Figure 12: RMSE comparison</figcaption></figure>
+<p><strong>Interpretation</strong></p>
+<ul>
+<li><strong>Holt-Winters</strong> is the most accurate model. Its average error is about 29
+thousand passengers per month (6.4 %), less than half the seasonal-naive error.</li>
+<li><strong>SARIMA</strong> is second (8.5 %). It reproduces the seasonal shape almost perfectly
+but sits slightly below the actual values. Growth in 1958 was weak (only +3.4 %),
+so a model trained up to 1958 projects a slower trend than the 11-12 % growth
+that followed in 1959-60.</li>
+<li>Models <strong>without a seasonal component</strong> (naive, SES, moving average, plain ARIMA)
+produce flat or smooth lines and cannot follow the summer peaks, so their errors
+are 2-4 times larger. SES estimated alpha = 1, which makes it identical to the naive
+forecast.</li>
+<li>Every seasonal model beats every non-seasonal one. Modelling seasonality is the
+single most important step for this data.</li>
+</ul>
+<h3>7.7 Residual diagnostics</h3>
+<figure><img src="outputs/figures/13_residual_diagnostics_best_model.png" alt="Residual diagnostics - Holt-Winters"><figcaption>Figure 13: Residual diagnostics - Holt-Winters</figcaption></figure>
+<figure><img src="outputs/figures/14_residual_diagnostics_sarima.png" alt="Residual diagnostics - SARIMA"><figcaption>Figure 14: Residual diagnostics - SARIMA</figcaption></figure>
+<table>
+<thead>
+<tr>
+  <th>Ljung-Box p-value at lag</th>
+  <th>6</th>
+  <th>12</th>
+  <th>18</th>
+  <th>24</th>
+  <th>Jarque-Bera p</th>
+  <th>Shapiro-Wilk p</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>Holt-Winters</td>
+  <td>0.002</td>
+  <td>0.027</td>
+  <td>0.012</td>
+  <td>0.015</td>
+  <td>0.075</td>
+  <td>0.023</td>
+</tr>
+<tr>
+  <td>SARIMA(0,1,1)(0,1,1)[12]</td>
+  <td>0.559</td>
+  <td>0.912</td>
+  <td>0.914</td>
+  <td>0.804</td>
+  <td>0.578</td>
+  <td>0.487</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>SARIMA residuals are white noise.</strong> All Ljung-Box p-values are &gt; 0.05, no ACF
+bar is significant beyond chance, the Q-Q plot follows the line, and both normality
+tests pass. Statistically, the model is fully adequate.</li>
+<li><strong>Holt-Winters residuals</strong> have mean about 0 and are close to normal (Jarque-Bera
+p = 0.075), but Ljung-Box rejects independence (p &lt; 0.05). Some short-lag
+autocorrelation is left, and the residual spread grows with the level because they are on
+the original scale. The model forecasts well, but its prediction intervals should
+be read as approximate.</li>
+</ul>
+<h3>7.8 Forecast for 1961-1962</h3>
+<p>The best model on the test set (Holt-Winters) was re-estimated on all 144 months
+and used to forecast 24 months ahead. Its 80 % and 95 % prediction intervals come from 5,000 simulated
+future paths.</p>
+<figure><img src="outputs/figures/15_future_forecast.png" alt="24-month forecast"><figcaption>Figure 15: 24-month forecast</figcaption></figure>
+<table>
+<thead>
+<tr>
+  <th>Month</th>
+  <th>Forecast</th>
+  <th>95 % interval</th>
+  <th></th>
+  <th>Month</th>
+  <th>Forecast</th>
+  <th>95 % interval</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>Jan 1961</td>
+  <td>445</td>
+  <td>409 - 481</td>
+  <td></td>
+  <td>Jan 1962</td>
+  <td>474</td>
+  <td>413 - 542</td>
+</tr>
+<tr>
+  <td>Feb 1961</td>
+  <td>418</td>
+  <td>383 - 454</td>
+  <td></td>
+  <td>Feb 1962</td>
+  <td>445</td>
+  <td>389 - 508</td>
+</tr>
+<tr>
+  <td>Mar 1961</td>
+  <td>465</td>
+  <td>425 - 508</td>
+  <td></td>
+  <td>Mar 1962</td>
+  <td>495</td>
+  <td>429 - 569</td>
+</tr>
+<tr>
+  <td>Apr 1961</td>
+  <td>495</td>
+  <td>451 - 541</td>
+  <td></td>
+  <td>Apr 1962</td>
+  <td>527</td>
+  <td>455 - 605</td>
+</tr>
+<tr>
+  <td>May 1961</td>
+  <td>506</td>
+  <td>458 - 553</td>
+  <td></td>
+  <td>May 1962</td>
+  <td>538</td>
+  <td>464 - 617</td>
+</tr>
+<tr>
+  <td>Jun 1961</td>
+  <td>573</td>
+  <td>518 - 630</td>
+  <td></td>
+  <td>Jun 1962</td>
+  <td>610</td>
+  <td>525 - 704</td>
+</tr>
+<tr>
+  <td>Jul 1961</td>
+  <td>664</td>
+  <td>597 - 732</td>
+  <td></td>
+  <td>Jul 1962</td>
+  <td>705</td>
+  <td>605 - 817</td>
+</tr>
+<tr>
+  <td>Aug 1961</td>
+  <td>655</td>
+  <td>590 - 723</td>
+  <td></td>
+  <td>Aug 1962</td>
+  <td>696</td>
+  <td>598 - 805</td>
+</tr>
+<tr>
+  <td>Sep 1961</td>
+  <td>547</td>
+  <td>489 - 606</td>
+  <td></td>
+  <td>Sep 1962</td>
+  <td>581</td>
+  <td>499 - 672</td>
+</tr>
+<tr>
+  <td>Oct 1961</td>
+  <td>488</td>
+  <td>436 - 542</td>
+  <td></td>
+  <td>Oct 1962</td>
+  <td>519</td>
+  <td>444 - 601</td>
+</tr>
+<tr>
+  <td>Nov 1961</td>
+  <td>416</td>
+  <td>371 - 464</td>
+  <td></td>
+  <td>Nov 1962</td>
+  <td>441</td>
+  <td>377 - 514</td>
+</tr>
+<tr>
+  <td>Dec 1961</td>
+  <td>460</td>
+  <td>409 - 515</td>
+  <td></td>
+  <td>Dec 1962</td>
+  <td>489</td>
+  <td>416 - 569</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>Forecast total for <strong>1961: about 6,132 thousand</strong> passengers (+7.3 % over 1960's 5,714 thousand).
+For <strong>1962: about 6,518 thousand</strong>.</li>
+<li>The peak forecast is <strong>705 thousand in July 1962</strong>. The seasonal pattern (Jul/Aug high,
+Nov low) is preserved.</li>
+<li>The intervals widen with the horizon because uncertainty accumulates.</li>
+</ul>
+<h2>8. Conclusion</h2>
+<ol>
+<li>The airline passenger series has a <strong>strong upward trend</strong> (STL strength 0.996)
+and a <strong>strong, stable 12-month seasonality</strong> (strength 0.959). The seasonality is
+<strong>multiplicative</strong>: July/August are about 22 % above average and November about 20 % below.</li>
+<li>The raw series is <strong>non-stationary</strong> (ADF p = 0.99, KPSS p = 0.01). A <strong>log transform
+plus one regular and one seasonal difference</strong> makes it stationary (ADF p = 0.0002,
+KPSS p = 0.10).</li>
+<li>The ACF/PACF of the stationary series and the AIC grid search both identify the
+Box-Jenkins <strong>airline model SARIMA(0,1,1)(0,1,1)[12]</strong>. Its residuals pass every
+diagnostic test (white noise, normal).</li>
+<li>On the 24-month test set, <strong>Holt-Winters with multiplicative seasonality was the
+most accurate model (MAE 28.98, RMSE 32.49, MAPE 6.39 %)</strong>. SARIMA was second (MAPE 8.52 %).
+Both beat the seasonal naive baseline (MAPE 15.52 %) by a wide margin, and every model
+without seasonality performed poorly.</li>
+<li>The best statistical fit (SARIMA, clean residuals) is not automatically the best
+forecaster. Out-of-sample testing is needed to choose a forecasting model.</li>
+<li>The refitted Holt-Winters model forecasts continued growth of about 7 % in 1961,
+with a peak of about 705 thousand passengers in July 1962.</li>
+</ol>
+<p><strong>Limitations and scope:</strong> the dataset is short (12 years) and historical. The
+forecasts assume that past trend and seasonality continue, and they do not include
+external factors such as fares, economic conditions or major events. Further
+work could add rolling-origin cross-validation, Box-Cox transforms, or
+models such as Prophet or LSTM.</p>
+<h2>9. References</h2>
+<ol>
+<li>Box, G.E.P., Jenkins, G.M., Reinsel, G.C. (1976/2015). <em>Time Series Analysis: Forecasting and Control</em>. Wiley. (Series G: airline passengers)</li>
+<li>Hyndman, R.J., Athanasopoulos, G. (2021). <em>Forecasting: Principles and Practice</em>, 3rd ed. OTexts. <a href="https://otexts.com/fpp3/">https://otexts.com/fpp3/</a></li>
+<li>Seabold, S., Perktold, J. (2010). <em>statsmodels: Econometric and statistical modeling with Python</em>. <a href="https://www.statsmodels.org/">https://www.statsmodels.org/</a></li>
+<li>Dataset CSV: <a href="https://raw.githubusercontent.com/jbrownlee/Datasets/master/airline-passengers.csv">https://raw.githubusercontent.com/jbrownlee/Datasets/master/airline-passengers.csv</a></li>
+</ol>
+</main></body></html>
