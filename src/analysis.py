@@ -1,7 +1,7 @@
 # %% [markdown]
 # # Time Series Analysis and Forecasting of Monthly Airline Passengers (1949-1960)
 #
-# **Subject:** Statistical Methods (SM) - Mini Project, TY BTech
+# **Subject:** Statistical Modelling (SM) - Mini Project, TY BTech
 #
 # This notebook/script performs a complete time series analysis on the classic
 # *Air Passengers* dataset (Box & Jenkins, 1976): exploration, decomposition,

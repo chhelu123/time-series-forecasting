@@ -1,6 +1,6 @@
 # Time Series Analysis and Forecasting of Monthly Airline Passengers (1949-1960)
 
-**Mini Project - Statistical Methods (SM), TY BTech**
+**Mini Project - Statistical Modelling (SM), TY BTech**
 
 **Live report:** https://chhelu123.github.io/time-series-forecasting/
 
